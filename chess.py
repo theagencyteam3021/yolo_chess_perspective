@@ -1,5 +1,5 @@
 from cv2 import cv2
-import torch
+import torch._C as torch
 import torch.backends.cudnn as cudnn
 import numpy as np
 
@@ -32,6 +32,16 @@ assert cap.isOpened(), 'Failed to open camera stream'
 
 rect = True
 
+if device.type != 'cpu':
+    model(torch.zeros(1, 3, imgsz, imgsz).to(device).type_as(next(model.parameters())))  # run once
+old_img_w = old_img_h = imgsz
+old_img_b = 1
+
+warmup = True
+
+conf_thres = 0.2
+iou_thres = 0.45
+
 def getBoard():
     #get image
     cap.grab()
@@ -43,6 +53,27 @@ def getBoard():
     img = img[:, :, :, ::-1].transpose(0, 3, 1, 2)
     img = np.ascontiguousarray(img)
 
+    #get ready for inference 
+    img = img[0]
+    img = torch.from_numpy(img).to(device)
+    img = img.half() if half else img.float()
+    img /= 255.0
+    if img.ndimension() == 3:
+        img = img.unsqueeze(0)
 
+    #Do a "warmup" for some reason, idk
+    if warmup and device.type != 'cpu' and (old_img_b != img.shape[0] or old_img_h != img.shape[2] or old_img_w != img.shape[3]):
+        old_img_b = img.shape[0]
+        old_img_h = img.shape[2]
+        old_img_w = img.shape[3]
+        for _ in range(3):
+            #Not nograd, maybe callibrating the gradients? Not sure, I didn't write this.
+            model(img, augment=False)[0]
+
+    #Actual inference
+    with torch.no_grad():   # Calculating gradients would cause a GPU memory leak
+        pred = model(img, augment=False)[0]
+     # Apply NMS
+    pred = non_max_suppression(pred, conf_thres, iou_thres, agnostic=False)
     
-
+    
