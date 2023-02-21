@@ -75,5 +75,11 @@ def getBoard():
         pred = model(img, augment=False)[0]
      # Apply NMS
     pred = non_max_suppression(pred, conf_thres, iou_thres, agnostic=False)
+    for det in pred:
+        if len(det):
+            det[:, :4] = scale_coords(img.shape[2:], det[:, :4], img0.shape).round()
+            for *xyxy, conf, cls in reversed(det):
+                xywh = xyxy2xywh(torch.tensor(xyxy).view(1,4)).view(-1).tolist()
+                center = (xywh[0], xywh[1]-xywh[3]+xywh[2]/2)
     
     
