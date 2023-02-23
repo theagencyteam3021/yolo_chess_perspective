@@ -31,6 +31,7 @@ cap = cv2.VideoCapture(0)
 assert cap.isOpened(), 'Failed to open camera stream'
 
 rect = True
+names = ['b','k','n','p','q','r','B','K','N','P','Q','R']
 
 if device.type != 'cpu':
     model(torch.zeros(1, 3, imgsz, imgsz).to(device).type_as(next(model.parameters())))  # run once
@@ -39,7 +40,7 @@ old_img_b = 1
 
 warmup = True
 
-conf_thres = 0.2
+conf_thres = 0.5
 iou_thres = 0.45
 
 M, rect_base = get_matrix_from_img("blank2.jpg")
@@ -103,8 +104,36 @@ def get_board():
         cv2.circle(trans_img, p, radius=10, color=(0, 0, 255))
         board_coors.append((transformed_pieces[i][0], (int(8*p[0]/rect_base), int(8*p[1]/rect_base))))
     print(board_coors)
+    
+    board = [[' ' for i in range(8)] for j in range(8)]
+    fer_board = ""
+    for p in board_coors:
+    	board[p[1][1]][p[1][0]]=names[p[0]]
+    for l in board:
+        print(l)
+        fer_line = ''
+        run = 0
+        for i, p in enumerate(l):
+    	    if p != ' ':
+    	        if run != 0:
+    	            fer_line += str(run)
+    	        fer_line += p
+    	        run = 0
+    	        
+    	    else:
+    	        run += 1
+    	        if i == 7:
+    	            fer_line += str(run)
+        fer_board += fer_line + '/'
+    fer_board = fer_board[:-1] + " w - - 0 0"
+    	
+    
         
     cv2.imshow("img",trans_img)
-    cv2.waitKey(60000)
+    cv2.waitKey(600)
+    print(fer_board)
+    
+    '''names = model.module.names if hasattr(model, 'module') else model.names
+    print(names)'''
     
 get_board()
