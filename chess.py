@@ -11,10 +11,16 @@ from utils.plots import plot_one_box
 from utils.torch_utils import select_device, load_classifier, time_synchronized, TracedModel
 from chesscorner import get_matrix_from_img, calculate_new_points
 
+from stockfish import Stockfish
+stockfish = Stockfish()
+
+
+camera_mode = True
+
 weights = 'weights/chess1.pt'
 device = select_device('0')
 half = device != 'cpu'
-trace = True
+trace = False
 imgsz=640
 
 model = attempt_load(weights, map_location=device)
@@ -27,8 +33,10 @@ if trace:
 if half:
     model.half()  # to FP16
 img0 = cv2.imread("nonblank2.jpg")
-cap = cv2.VideoCapture(0)
-assert cap.isOpened(), 'Failed to open camera stream'
+
+if camera_mode:
+    cap = cv2.VideoCapture(0)
+    assert cap.isOpened(), 'Failed to open camera stream'
 
 rect = True
 names = ['b','k','n','p','q','r','B','K','N','P','Q','R']
@@ -40,16 +48,50 @@ old_img_b = 1
 
 warmup = True
 
-conf_thres = 0.5
+conf_thres = 0.2
 iou_thres = 0.45
 
-M, rect_base = get_matrix_from_img("blank2.jpg")
 
-def get_board():
-    #get image
+
+def set_orientation(camera_mode):
+    
+    if not camera_mode:
+        print("Using stored image for perspective transformation")
+        im = cv2.imread("blank2.jpg")
+        M, rect_base = get_matrix_from_img(im)
+        im = cv2.warpPerspective(im, M, (int(rect_base), int(rect_base)))
+        cv2.imshow("im",im)
+        k = cv2.waitKey(0)
+        if k == 27:
+            cv2.destroyAllWindows()
+        return M, rect_base
+    input("Take a picture of the empty board")
     cap.grab()
     success, im = cap.retrieve()
-    #img0 = im if success else img0
+    if not success:
+        print("Failed to get blank board")
+        return set_orientation(False)
+    M, rect_base = get_matrix_from_img(im)
+    im = cv2.warpPerspective(im, M, (int(rect_base), int(rect_base)))
+    cv2.imshow("im",im)
+    k = cv2.waitKey(0)
+    if k == 27:
+        cv2.destroyAllWindows()
+    return M, rect_base
+    
+    
+    
+
+def get_board(M, rect_base):
+    #get image
+    img0=cv2.imread("nonblank2.jpg")
+    if camera_mode:
+        cap.grab()
+        for i in range(10):
+            success, im = cap.read()
+        img0 = im if success else img0
+        #cv2.imshow('img0',img0)
+        #cv2.waitKey(10000)
     #resize and convert
     img = [letterbox(img0, imgsz, auto=rect, stride=stride)[0]]
     img = np.stack(img, 0)
@@ -95,6 +137,10 @@ def get_board():
     #Perspective transform
     #print(og_pieces)
     trans_img = cv2.warpPerspective(img0, M, (int(rect_base), int(rect_base)))
+    cv2.imshow("img", trans_img)
+    key = cv2.waitKey(10000)
+    if key == 27:
+        cv2.destroyAllWindows()
     piece_centers = [p[1] for p in og_pieces]
     new_centers = calculate_new_points(np.array(piece_centers),M).astype("int64").tolist()
     transformed_pieces = [(og_pieces[i][0], tuple(c)) for i, c in enumerate(new_centers)]
@@ -103,37 +149,71 @@ def get_board():
     for i, p in enumerate(new_centers):
         cv2.circle(trans_img, p, radius=10, color=(0, 0, 255))
         board_coors.append((transformed_pieces[i][0], (int(8*p[0]/rect_base), int(8*p[1]/rect_base))))
-    print(board_coors)
+    #print(board_coors)
     
     board = [[' ' for i in range(8)] for j in range(8)]
-    fer_board = ""
+    fen_board = ""
     for p in board_coors:
     	board[p[1][1]][p[1][0]]=names[p[0]]
     for l in board:
         print(l)
-        fer_line = ''
+        fen_line = ''
         run = 0
         for i, p in enumerate(l):
     	    if p != ' ':
     	        if run != 0:
-    	            fer_line += str(run)
-    	        fer_line += p
+    	            fen_line += str(run)
+    	        fen_line += p
     	        run = 0
     	        
     	    else:
     	        run += 1
     	        if i == 7:
-    	            fer_line += str(run)
-        fer_board += fer_line + '/'
-    fer_board = fer_board[:-1] + " w - - 0 0"
+    	            fen_line += str(run)
+        fen_board += fen_line + '/'
+    fen_board = fen_board[:-1] + " w - - 0 0"
     	
     
         
-    cv2.imshow("img",trans_img)
-    cv2.waitKey(600)
-    print(fer_board)
+    #cv2.imshow("img",trans_img)
+    #cv2.waitKey(600)
+    #print(fen_board)
+    return board
     
     '''names = model.module.names if hasattr(model, 'module') else model.names
     print(names)'''
+def next_move(board):
+    fen_board = ""
+    for l in board:
+        #print(l)
+        fen_line = ''
+        run = 0
+        for i, p in enumerate(l):
+    	    if p != ' ':
+    	        if run != 0:
+    	            fen_line += str(run)
+    	        fen_line += p
+    	        run = 0
+    	        
+    	    else:
+    	        run += 1
+    	        if i == 7:
+    	            fen_line += str(run)
+        fen_board += fen_line + '/'
+    fen_board = fen_board[:-1] + " w - - 0 0"
+    #fen_board = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBqR w - - 0 1' #testing only REMOVE
+    print(fen_board)
+    if stockfish.is_fen_valid(fen_board):
+        stockfish.set_fen_position(fen_board)
+        move = str(stockfish.get_best_move())
+        t = {'A':0,'B':1,'C':2,'D':3,'E':4,'F':5,'G':6,'H':7}
+        start = move[:2].upper()
+        end = move[2:].upper()
+        capture = bool(stockfish.get_what_is_on_square(end.lower()))
+        return start, end, capture 
+        
     
-get_board()
+M, rect_base=set_orientation(camera_mode)
+input("set up pieces")   
+board = get_board(M, rect_base)
+print(next_move(board))

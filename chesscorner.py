@@ -5,8 +5,8 @@ import matplotlib.pyplot as plt
 cbs = (7,7)
 DEBUG = False
 criteria = (cv.TERM_CRITERIA_EPS + cv.TERM_CRITERIA_MAX_ITER, 30, 0.001)
-def get_matrix_from_img(source):
-	img = cv.imread(source)
+def get_matrix_from_img(img):
+	
 	objp = np.zeros((7*7,3), np.float32)
 	objp[:,:2] = np.mgrid[0:7,0:7].T.reshape(-1,2)
 	objpoints = [] # 3d point in real world space
