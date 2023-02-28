@@ -12,15 +12,18 @@ from utils.torch_utils import select_device, load_classifier, time_synchronized,
 from chesscorner import get_matrix_from_img, calculate_new_points
 
 from stockfish import Stockfish
+import time
+import os
 stockfish = Stockfish()
 
 
 camera_mode = True
+show_board = True
 
 weights = 'weights/chess1.pt'
 device = select_device('0')
 half = device != 'cpu'
-trace = False
+trace = True
 imgsz=640
 
 model = attempt_load(weights, map_location=device)
@@ -48,7 +51,7 @@ old_img_b = 1
 
 warmup = True
 
-conf_thres = 0.2
+conf_thres = 0.1
 iou_thres = 0.45
 
 
@@ -65,12 +68,18 @@ def set_orientation(camera_mode):
         if k == 27:
             cv2.destroyAllWindows()
         return M, rect_base
-    input("Take a picture of the empty board")
-    cap.grab()
-    success, im = cap.retrieve()
-    if not success:
-        print("Failed to get blank board")
-        return set_orientation(False)
+    n = input("Take a picture of the empty board")
+    if not n:
+        cap.grab()
+        success, im = cap.retrieve()
+        if not success:
+            print("Failed to get blank board")
+            return set_orientation(False)
+        cv2.imshow("im0", im)
+        cv2.waitKey(5000)
+        cv2.imwrite("latest_blank.jpg", im)
+    else:
+        im = cv2.imread("latest_blank.jpg")
     M, rect_base = get_matrix_from_img(im)
     im = cv2.warpPerspective(im, M, (int(rect_base), int(rect_base)))
     cv2.imshow("im",im)
@@ -90,6 +99,9 @@ def get_board(M, rect_base):
         for i in range(10):
             success, im = cap.read()
         img0 = im if success else img0
+        print("Writing image")
+        cv2.imwrite(str(time.time())+'.jpg',img0)
+        
         #cv2.imshow('img0',img0)
         #cv2.waitKey(10000)
     #resize and convert
@@ -138,7 +150,7 @@ def get_board(M, rect_base):
     #print(og_pieces)
     trans_img = cv2.warpPerspective(img0, M, (int(rect_base), int(rect_base)))
     cv2.imshow("img", trans_img)
-    key = cv2.waitKey(10000)
+    key = cv2.waitKey(0)
     if key == 27:
         cv2.destroyAllWindows()
     piece_centers = [p[1] for p in og_pieces]
@@ -182,7 +194,7 @@ def get_board(M, rect_base):
     
     '''names = model.module.names if hasattr(model, 'module') else model.names
     print(names)'''
-def next_move(board):
+def to_fen(board):
     fen_board = ""
     for l in board:
         #print(l)
@@ -201,19 +213,26 @@ def next_move(board):
     	            fen_line += str(run)
         fen_board += fen_line + '/'
     fen_board = fen_board[:-1] + " w - - 0 0"
-    #fen_board = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBqR w - - 0 1' #testing only REMOVE
-    print(fen_board)
+    if show_board and stockfish.is_fen_valid(fen_board):
+        stockfish.set_fen_position(fen_board)
+        print(stockfish.get_board_visual())
+    return fen_board, stockfish.is_fen_valid(fen_board)
+    
+    
+def next_move(fen_board):
+    
+    #print(fen_board)
     if stockfish.is_fen_valid(fen_board):
         stockfish.set_fen_position(fen_board)
         move = str(stockfish.get_best_move())
-        t = {'A':0,'B':1,'C':2,'D':3,'E':4,'F':5,'G':6,'H':7}
         start = move[:2].upper()
         end = move[2:].upper()
         capture = bool(stockfish.get_what_is_on_square(end.lower()))
         return start, end, capture 
-        
     
-M, rect_base=set_orientation(camera_mode)
-input("set up pieces")   
-board = get_board(M, rect_base)
-print(next_move(board))
+        
+if __name__ == '__main__':    
+    M, rect_base=set_orientation(camera_mode)
+    input("set up pieces")   
+    board = get_board(M, rect_base)
+    print(next_move(to_fen(board)))
