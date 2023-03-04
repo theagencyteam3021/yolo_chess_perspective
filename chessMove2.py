@@ -26,7 +26,7 @@ import board # Position Values
 #robotIP = "172.20.92.238"
 robotIP = "10.30.21.100"
 
-dropdist = 0.075 # meters of drop and pick
+dropdist = 0.077 # meters of drop and pick
 
 
 # Initialization

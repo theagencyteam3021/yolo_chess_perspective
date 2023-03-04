@@ -20,7 +20,7 @@ stockfish = Stockfish()
 camera_mode = True
 show_board = True
 
-weights = 'weights/chess1.pt'
+weights = 'weights/chess2.pt'
 device = select_device('0')
 half = device != 'cpu'
 trace = True
@@ -136,7 +136,7 @@ def get_board(M, rect_base):
      # Apply NMS
     pred = non_max_suppression(pred, conf_thres, iou_thres, agnostic=False)
     og_pieces = [] #(cls, (x, y))
-    
+    img1=img0.copy()
     for det in pred:
         if len(det):
             det[:, :4] = scale_coords(img.shape[2:], det[:, :4], img0.shape).round()
@@ -144,13 +144,15 @@ def get_board(M, rect_base):
                 xywh = xyxy2xywh(torch.tensor(xyxy).view(1,4)).view(-1).tolist()
                 center = (int(xywh[0]), int(xywh[1]+xywh[3]/2-xywh[2]/2))
                 og_pieces.append((int(cls), center))
-                #cv2.circle(img0, center, radius=10, color=(0, 0, 255))
+                
+                cv2.circle(img1, center, radius=10, color=(0, 0, 255))
                 #print(int(cls), center)
     #Perspective transform
     #print(og_pieces)
+    cv2.imwrite('centers1.jpg', img1)
     trans_img = cv2.warpPerspective(img0, M, (int(rect_base), int(rect_base)))
     cv2.imshow("img", trans_img)
-    key = cv2.waitKey(0)
+    key = cv2.waitKey(100)
     if key == 27:
         cv2.destroyAllWindows()
     piece_centers = [p[1] for p in og_pieces]
@@ -162,7 +164,7 @@ def get_board(M, rect_base):
         cv2.circle(trans_img, p, radius=10, color=(0, 0, 255))
         board_coors.append((transformed_pieces[i][0], (int(8*p[0]/rect_base), int(8*p[1]/rect_base))))
     #print(board_coors)
-    
+    cv2.imwrite('centers2.jpg',trans_img)
     board = [[' ' for i in range(8)] for j in range(8)]
     fen_board = ""
     for p in board_coors:
@@ -222,13 +224,13 @@ def to_fen(board):
 def next_move(fen_board):
     
     #print(fen_board)
-    if stockfish.is_fen_valid(fen_board):
-        stockfish.set_fen_position(fen_board)
-        move = str(stockfish.get_best_move())
-        start = move[:2].upper()
-        end = move[2:].upper()
-        capture = bool(stockfish.get_what_is_on_square(end.lower()))
-        return start, end, capture 
+    #if stockfish.is_fen_valid(fen_board):
+    stockfish.set_fen_position(fen_board)
+    move = str(stockfish.get_best_move())
+    start = move[:2].upper()
+    end = move[2:].upper()
+    capture = bool(stockfish.get_what_is_on_square(end.lower()))
+    return start, end, capture 
     
         
 if __name__ == '__main__':    
