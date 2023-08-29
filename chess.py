@@ -20,7 +20,7 @@ stockfish = Stockfish()
 camera_mode = True
 show_board = True
 
-weights = 'weights/chess2.pt'
+weights = 'weights/chess4.pt'
 device = select_device('0')
 half = device != 'cpu'
 trace = True
@@ -162,7 +162,8 @@ def get_board(M, rect_base):
     board_coors = [] 
     for i, p in enumerate(new_centers):
         cv2.circle(trans_img, p, radius=10, color=(0, 0, 255))
-        board_coors.append((transformed_pieces[i][0], (int(8*p[0]/rect_base), int(8*p[1]/rect_base))))
+        board_coors.append((transformed_pieces[i][0], (min(7,max(0,(int(8*p[0]/rect_base)))), min(7,max(0,int(8*p[1]/rect_base))))))
+
     #print(board_coors)
     cv2.imwrite('centers2.jpg',trans_img)
     board = [[' ' for i in range(8)] for j in range(8)]
@@ -214,7 +215,7 @@ def to_fen(board):
     	        if i == 7:
     	            fen_line += str(run)
         fen_board += fen_line + '/'
-    fen_board = fen_board[:-1] + " w - - 0 0"
+    fen_board = fen_board[:-1] + " b - - 0 0"
     if show_board and stockfish.is_fen_valid(fen_board):
         stockfish.set_fen_position(fen_board)
         print(stockfish.get_board_visual())

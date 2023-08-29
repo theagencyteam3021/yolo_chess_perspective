@@ -1,18 +1,25 @@
 from chess import set_orientation, get_board, next_move, to_fen
 from chessMove2 import move, drop_capture
+#from button_utils import wait_for_button
 drop_capture()
 M, rect_base = set_orientation(True)
-cmd = ""
+
 input()
 d = {'a':0,'b':1,'c':2, 'd':3, 'e':4, 'f':5, 'g':6, 'h':7}
-while cmd.lower() not in ["quit","q"]:
+CONFIRM_BOARD = True
+
+
+while True:
     drop_capture()
     board = get_board(M, rect_base)
-    fen, val = to_fen(board)
+    fen, val = to_fen(board)  
     if val:
         start, end, capture = next_move(fen)
         print(start,end,capture)
-        veto = input()
+        if CONFIRM_BOARD:
+            veto = input()
+        else:
+            veto = False
         if not veto:
             move(start,end,capture)
         else:
@@ -31,6 +38,7 @@ while cmd.lower() not in ["quit","q"]:
                     move(s,e,c)
         #move(next_move(fen))
         drop_capture()
-        cmd = input()
+        #wait_for_button()
+        input()
     else:
         input('Invalid board.')

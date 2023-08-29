@@ -20,6 +20,7 @@ import rtde_io
 
 # Custom Modules
 import board # Position Values
+#from button_utils import wait_for_gripper
 
 # Variables
 #==============================================================================
@@ -28,6 +29,9 @@ robotIP = "10.30.21.100"
 
 dropdist = 0.077 # meters of drop and pick
 
+# Modes
+#==============================================================================
+WAIT_FOR_IN = True
 
 # Initialization
 #==============================================================================
@@ -58,6 +62,7 @@ def pick(position, board=board):
     sleep(1)
     rtde_io.setStandardDigitalOut(5, True)
     sleep(1)
+    
     target[2] += dropdist
     rtde_c.moveL(target) #pick
 
