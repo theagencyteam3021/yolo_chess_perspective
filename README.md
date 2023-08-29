@@ -260,6 +260,7 @@ Yolov7-semantic & YOLOv7-panoptic & YOLOv7-caption
     </a>
 </div>
 
+Samson didn't help
 
 ## Acknowledgements
 
